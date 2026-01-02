@@ -25,6 +25,7 @@ var (
 	AwsRegion           string
 	CloudflareApiToken  string
 	CloudFlareAccountId string
+	BuilderImage        string
 )
 
 var (
@@ -75,7 +76,7 @@ func worker(wg *sync.WaitGroup, id int) {
 			"-e", fmt.Sprintf("AWS_DEFAULT_REGION=%s", AwsRegion),
 			"-e", fmt.Sprintf("CLOUDFLARE_API_TOKEN=%s", CloudflareApiToken),
 			"-e", fmt.Sprintf("CLOUDFLARE_ACCOUNT_ID=%s", CloudFlareAccountId),
-			"astro-builder:latest",
+			BuilderImage,
 		)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			fmt.Println("build failed:\n", string(out), err)
@@ -104,6 +105,7 @@ func init() {
 	AwsRegion = os.Getenv("AWS_DEFAULT_REGION")
 	CloudflareApiToken = os.Getenv("CLOUDFLARE_API_TOKEN")
 	CloudFlareAccountId = os.Getenv("CLOUDFLARE_ACCOUNT_ID")
+	BuilderImage = os.Getenv("BUILDER_IMAGE")
 }
 
 func main() {
