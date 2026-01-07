@@ -73,7 +73,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: "1.21"
           cache: true
 
       - name: Build Linux binary
@@ -93,6 +93,12 @@ jobs:
           aws s3 cp qr-menu-build-worker s3://qr-menu-artifacts/build-worker/qr-menu-build-worker-${{ github.sha }}
           aws s3 cp qr-menu-build-worker s3://qr-menu-artifacts/build-worker/qr-menu-build-worker-latest
 
+      - name: Upload deployment files to S3
+        run: |
+          aws s3 cp deployment/deploy.sh s3://qr-menu-artifacts/deployment/deploy.sh
+          aws s3 cp deployment/setup-env.sh s3://qr-menu-artifacts/deployment/setup-env.sh
+          aws s3 cp deployment/qr-menu-build-worker.service s3://qr-menu-artifacts/deployment/qr-menu-build-worker.service
+
       - name: Deployment summary
         run: |
           echo "✅ Container images and binary built successfully!"
@@ -101,6 +107,10 @@ jobs:
           echo "  - unpublish-image:latest"
           echo "🔧 Binary uploaded to S3:"
           echo "  - s3://qr-menu-artifacts/build-worker/qr-menu-build-worker-latest"
+          echo "📄 Deployment files uploaded to S3:"
+          echo "  - s3://qr-menu-artifacts/deployment/deploy.sh"
+          echo "  - s3://qr-menu-artifacts/deployment/setup-env.sh"
+          echo "  - s3://qr-menu-artifacts/deployment/qr-menu-build-worker.service"
           echo ""
           echo "⚠️  Manual step required:"
           echo "SSH to EC2 worker instance and run the deployment script to install the binary and configure systemd."
