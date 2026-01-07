@@ -149,6 +149,57 @@ func handleUnpublishJob(payloadStr string, workerId int) {
 	slog.Info("DONE", "worker id", workerId)
 }
 
+func loginToECR() error {
+	slog.Info("Logging into ECR", "region", AwsRegion)
+
+	// Get ECR login password using AWS CLI with IAM role credentials
+	cmd := exec.Command("aws", "ecr", "get-login-password", "--region", AwsRegion)
+	password, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get ECR password: %w", err)
+	}
+
+	// Extract registry URL from builder image (format: 123456789012.dkr.ecr.region.amazonaws.com/image:tag)
+	registry := strings.Split(BuilderImage, "/")[0]
+
+	slog.Info("Logging Docker into ECR registry", "registry", registry)
+
+	// Login to ECR using Docker CLI
+	loginCmd := exec.Command("docker", "login", "--username", "AWS", "--password-stdin", registry)
+	loginCmd.Stdin = strings.NewReader(string(password))
+
+	output, err := loginCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to login to ECR: %w, output: %s", err, string(output))
+	}
+
+	slog.Info("Successfully logged into ECR")
+	return nil
+}
+
+func pullImages() error {
+	slog.Info("Pulling container images from ECR")
+
+	// Pull builder image
+	slog.Info("Pulling builder image", "image", BuilderImage)
+	pullBuilder := exec.Command("docker", "pull", BuilderImage)
+	if output, err := pullBuilder.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to pull builder image: %w, output: %s", err, string(output))
+	}
+	slog.Info("Successfully pulled builder image")
+
+	// Pull unpublish image
+	slog.Info("Pulling unpublish image", "image", UnpublishImage)
+	pullUnpublish := exec.Command("docker", "pull", UnpublishImage)
+	if output, err := pullUnpublish.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to pull unpublish image: %w, output: %s", err, string(output))
+	}
+	slog.Info("Successfully pulled unpublish image")
+
+	slog.Info("All images pulled successfully")
+	return nil
+}
+
 func init() {
 	err := godotenv.Load()
 	if err != nil {
@@ -174,6 +225,18 @@ func main() {
 	wg.Add(numWorkers)
 
 	slog.Info("qr-menu-build-worker started", "workers", numWorkers, "redis_addr", RedisAddr, "queue_key", ListenerKey)
+
+	// Login to ECR before starting workers
+	if err := loginToECR(); err != nil {
+		slog.Error("Failed to login to ECR - workers may fail to pull images", "err", err)
+		// Continue anyway - first job will show clear error if auth is broken
+	} else {
+		// Pull images after successful authentication
+		if err := pullImages(); err != nil {
+			slog.Error("Failed to pull images - workers will try to pull on first use", "err", err)
+			// Continue anyway - docker will pull on first container run if needed
+		}
+	}
 
 	for i := range numWorkers {
 		go worker(&wg, i+1)
