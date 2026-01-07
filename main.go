@@ -32,7 +32,7 @@ var (
 
 var (
 	ctx    = context.Background()
-	client = redis.NewClient(&redis.Options{Addr: RedisAddr})
+	client *redis.Client
 )
 
 type JobType struct {
@@ -164,6 +164,8 @@ func init() {
 	CloudFlareAccountId = os.Getenv("CLOUDFLARE_ACCOUNT_ID")
 	BuilderImage = os.Getenv("BUILDER_IMAGE")
 	UnpublishImage = os.Getenv("UNPUBLISH_IMAGE")
+
+	client = redis.NewClient(&redis.Options{Addr: RedisAddr})
 }
 
 func main() {
@@ -171,7 +173,7 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
 
-	slog.Info("qr-menu-build-worker started", "workers", numWorkers)
+	slog.Info("qr-menu-build-worker started", "workers", numWorkers, "redis_addr", RedisAddr, "queue_key", ListenerKey)
 
 	for i := range numWorkers {
 		go worker(&wg, i+1)
